@@ -6,7 +6,7 @@ function Ship(color){
     this.vel = createVector(0,0);
     this.isBoosting = false;
     this.color = color;
-    
+    this.lifebar = 100;
     
     
     this.boosting = function(b){
@@ -17,9 +17,9 @@ function Ship(color){
         this.vel.add(force);
     }
    
-    //gravitácioval probálkoztam
-   // this.checkLanding = function(){
-   //    if ((this.pos-this.r) > (height - this.r)) {
+    //tried adding gravity
+    // this.checkLanding = function(){
+    //    if ((this.pos-this.r) > (height - this.r)) {
     //        this.vel.y *= -0.9;
     //        
     //    }
@@ -53,6 +53,11 @@ function Ship(color){
             line(this.r-(this.r-3),this.r+5,this.r-(this.r),this.r);
             line(this.r-(this.r+3),this.r+5,this.r-(this.r),this.r);
         }
+        
+        stroke(255);
+        strokeWeight(1);
+        fill('red');
+        rect(10, 25, 10+this.lifebar/10, 3);
         pop();
     }
     

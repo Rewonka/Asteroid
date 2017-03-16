@@ -36,6 +36,7 @@ function draw() {
         if (lasersOne.length >= 1) {
             if (pointInTriangle(lasersOne[i], shipTwo)) {
                 console.log("Ship Two HIT!");
+                shipTwo.lifebar -= 10;
                 lasersOne.splice(i, 1);
             }
         }
@@ -51,6 +52,7 @@ function draw() {
         if (lasersTwo.length >= 1) {
             if (pointInTriangle(lasersTwo[i], shipOne)) {
                 console.log("Ship One HIT!");
+                shipOne.lifebar -= 10;
                 lasersTwo.splice(i, 1);
             }
         }
