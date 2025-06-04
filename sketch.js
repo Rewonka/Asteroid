@@ -5,6 +5,13 @@ var asteroids = [];
 var lasersOne = [];
 var lasersTwo = [];
 
+var socket;
+var playerType = 'spectator';
+var myShip;
+var remoteShip;
+var myLasers;
+var remoteLasers;
+
 function setup() {
     createCanvas(windowWidth, windowHeight);
     gravity = createVector(0, 0.09);
@@ -14,33 +21,63 @@ function setup() {
     for (i = 0; i < 5; i++) {
         asteroids.push(new Asteroid());
     }
+
+    socket = io();
+    socket.on('playerType', function(type){
+        playerType = type;
+        if(type === 'p1') {
+            myShip = shipOne;
+            myLasers = lasersOne;
+            remoteShip = shipTwo;
+            remoteLasers = lasersTwo;
+        } else if(type === 'p2') {
+            myShip = shipTwo;
+            myLasers = lasersTwo;
+            remoteShip = shipOne;
+            remoteLasers = lasersOne;
+        } else {
+            myShip = shipOne;
+            remoteShip = shipTwo;
+            myLasers = lasersOne;
+            remoteLasers = lasersTwo;
+        }
+    });
+
+    socket.on('state', function(data){
+        if(data.id !== playerType){
+            var ship = data.id === 'p1' ? shipOne : shipTwo;
+            ship.pos.x = data.state.x;
+            ship.pos.y = data.state.y;
+            ship.heading = data.state.heading;
+            ship.rotation = data.state.rotation;
+            ship.isBoosting = data.state.isBoosting;
+            ship.lifebar = data.state.lifebar;
+        }
+    });
+
+    socket.on('shoot', function(data){
+        if(data.id !== playerType){
+            var arr = data.id === 'p1' ? lasersOne : lasersTwo;
+            arr.push(new Laser(createVector(data.x, data.y), data.heading));
+        }
+    });
 }
 
 function draw() {
     background(0);
 
-    //for (var i = 0; i < asteroids.length; i++){
-    //    asteroids[i].render();
-    //    asteroids[i].update();
-    //    asteroids[i].edges();
-    //}
     for (var i = lasersOne.length - 1; i >= 0; i--) {
         lasersOne[i].render();
         lasersOne[i].update();
         if (lasersOne[i].offscreen()) {
             lasersOne.splice(i, 1);
         }
-        //if (lasersOne[i].hits(shipTwo)) {
-        //    console.log("Hit!");
-        //}
         if (lasersOne.length >= 1) {
             if (pointInTriangle(lasersOne[i], shipTwo)) {
-                console.log("Ship Two HIT!");
                 shipTwo.lifebar -= 10;
                 lasersOne.splice(i, 1);
             }
         }
-
     }
 
     for (var i = lasersTwo.length - 1; i >= 0; i--) {
@@ -51,28 +88,33 @@ function draw() {
         }
         if (lasersTwo.length >= 1) {
             if (pointInTriangle(lasersTwo[i], shipOne)) {
-                console.log("Ship One HIT!");
                 shipOne.lifebar -= 10;
                 lasersTwo.splice(i, 1);
             }
         }
     }
 
+    if (myShip) {
+        myShip.render();
+        myShip.turn();
+        myShip.update();
+        myShip.edges();
+    }
 
+    if (remoteShip && playerType !== 'spectator') {
+        remoteShip.render();
+    }
 
-    shipOne.render();
-    shipOne.turn();
-    shipOne.update();
-    //shipOne.applyForce(gravity);
-    shipOne.edges();
-    //ship.checkLanding();
-
-    shipTwo.render();
-    shipTwo.turn();
-    shipTwo.update();
-    shipTwo.edges();
-    //console.log(shipOne.pos);
-
+    if (playerType === 'p1' || playerType === 'p2') {
+        socket.emit('state', {
+            x: myShip.pos.x,
+            y: myShip.pos.y,
+            heading: myShip.heading,
+            rotation: myShip.rotation,
+            isBoosting: myShip.isBoosting,
+            lifebar: myShip.lifebar
+        });
+    }
 }
 
 function sign(p1x, p1y, p2x, p2y, p3x, p3y) {
@@ -101,34 +143,43 @@ function pointInTriangle(laser, ship) {
 }
 
 function keyReleased() {
-    if (keyCode == RIGHT_ARROW || keyCode == LEFT_ARROW) {
-        shipOne.setRotation(0);
-    } else if (keyCode == UP_ARROW) {
-        shipOne.boosting(false);
-    } else if (keyCode == 65 || keyCode == 68) {
-        shipTwo.setRotation(0);
-    } else if (keyCode == 87) {
-        shipTwo.boosting(false);
+    if (playerType === 'p1') {
+        if (keyCode == RIGHT_ARROW || keyCode == LEFT_ARROW) {
+            shipOne.setRotation(0);
+        } else if (keyCode == UP_ARROW) {
+            shipOne.boosting(false);
+        }
+    } else if (playerType === 'p2') {
+        if (keyCode == 65 || keyCode == 68) {
+            shipTwo.setRotation(0);
+        } else if (keyCode == 87) {
+            shipTwo.boosting(false);
+        }
     }
 }
 
 function keyPressed() {
-    if (key == ' ') {
-        lasersOne.push(new Laser(shipOne.pos, shipOne.heading));
-    } else if (keyCode == RIGHT_ARROW) {
-        shipOne.setRotation(0.1);
-    } else if (keyCode == LEFT_ARROW) {
-        shipOne.setRotation(-0.1);
-    } else if (keyCode == UP_ARROW) {
-        shipOne.boosting(true);
-        //shipTwo.boosting(true);
-    } else if (keyCode == 48) {
-        lasersTwo.push(new Laser(shipTwo.pos, shipTwo.heading));
-    } else if (keyCode == 68) {
-        shipTwo.setRotation(0.1);
-    } else if (keyCode == 65) {
-        shipTwo.setRotation(-0.1);
-    } else if (keyCode == 87) {
-        shipTwo.boosting(true);
+    if (playerType === 'p1') {
+        if (key == ' ') {
+            lasersOne.push(new Laser(shipOne.pos.copy(), shipOne.heading));
+            socket.emit('shoot', { id: 'p1', x: shipOne.pos.x, y: shipOne.pos.y, heading: shipOne.heading });
+        } else if (keyCode == RIGHT_ARROW) {
+            shipOne.setRotation(0.1);
+        } else if (keyCode == LEFT_ARROW) {
+            shipOne.setRotation(-0.1);
+        } else if (keyCode == UP_ARROW) {
+            shipOne.boosting(true);
+        }
+    } else if (playerType === 'p2') {
+        if (keyCode == 48) {
+            lasersTwo.push(new Laser(shipTwo.pos.copy(), shipTwo.heading));
+            socket.emit('shoot', { id: 'p2', x: shipTwo.pos.x, y: shipTwo.pos.y, heading: shipTwo.heading });
+        } else if (keyCode == 68) {
+            shipTwo.setRotation(0.1);
+        } else if (keyCode == 65) {
+            shipTwo.setRotation(-0.1);
+        } else if (keyCode == 87) {
+            shipTwo.boosting(true);
+        }
     }
 }
